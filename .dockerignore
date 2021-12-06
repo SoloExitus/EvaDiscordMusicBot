@@ -1,2 +1,8 @@
 .idea
 .venv
+.env
+.git
+.gitignore
+__pycache__
+LICENSE
+README.md

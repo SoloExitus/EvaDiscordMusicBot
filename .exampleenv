@@ -1,0 +1,4 @@
+token = 'your_discord_bot_token'
+lavalink_host = "lavalink_host_name"
+lavalink_uri = "http://localhost:2333"
+lavalink_password = "your_lavalink_server_password"

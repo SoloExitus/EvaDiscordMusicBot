@@ -1,6 +1,5 @@
 import asyncio
-
-import async_timeout
+import os
 import datetime
 import re
 import random
@@ -189,13 +188,11 @@ class Player(wavelink.Player):
         track = self.queue.current_track
 
         if track is not None:
-            if self.wait:
-                self.wait.cancel()
-                self.wait = None
+            self.cancelWait()
             return await self.play(track)
 
         await self.stop()
-        await self.startwait()
+        self.startWait()
 
 
     async def waittask(self):
@@ -208,11 +205,16 @@ class Player(wavelink.Player):
                 await self.play(track)
                 #await self.track info
 
-    async def startwait(self):
-        if self.wait:
-            self.wait.cancel()
+    def startWait(self):
+        self.cancelWait()
 
         self.wait = asyncio.create_task(self.waittask())
+
+    def cancelWait(self):
+        if self.wait:
+            self.wait.cancel()
+            self.wait = None
+
 
 
     async def playnext(self):
@@ -239,10 +241,10 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
 
         nodes = {
             "MAIN": {
-                "host": "127.0.0.1",
+                "host": os.getenv('lavalink_host'),
                 "port": 2333,
-                "rest_uri": "http://127.0.0.1:2333",
-                "password": "superpowerpassword",
+                "rest_uri": os.getenv('lavalink_uri'),
+                "password": os.getenv('lavalink_password'),
                 "identifier": "MAIN",
                 "region": "europe",
             }
@@ -250,6 +252,9 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
 
         for node in nodes.values():
             await self.wavelink.initiate_node(**node)
+
+
+
 
     async def cog_check(self, ctx):
         """Cog wide check, which disallows commands in DMs."""
@@ -266,9 +271,11 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
         if member.bot:
             return
 
-        if not [m for m in before.channel.members if not m.bot]:
-            player: Player = self.wavelink.get_player(member.guild.id, cls=Player)
-            await player.teardown()
+        members = getattr(before.channel, 'members', None)
+        if members:
+            if not [m for m in members if not m.bot]:
+                player: Player = self.wavelink.get_player(member.guild.id, cls=Player)
+                await player.teardown()
 
     # Wavelink Listeners ---------------------------------
 
@@ -298,7 +305,7 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
 
         await player.connect(channel.id)
         await ctx.send(f'Connecting to **`{channel.name}`**', delete_after=15)
-        await player.startwait()
+        player.startWait()
 
     @commands.command(name="disconnect", aliases=["leave","out"])
     async def disconnect(self, ctx):
@@ -341,7 +348,7 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
     async def pause(self, ctx):
         player: Player = self.wavelink.get_player(ctx.guild.id, cls=Player)
 
-        await player.startwait()
+        player.startWait()
 
         if player.is_paused:
             raise PlayerIsAlreadyPaused
@@ -355,6 +362,7 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
 
         # if not player.is_paused:
         #     raise PlayerIsAlreadyPaused
+        player.cancelWait()
         await player.set_pause(False)
         await ctx.reply("Playback resumed.")
 
@@ -369,7 +377,7 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
     async def queue(self, ctx):
         player: Player = self.wavelink.get_player(ctx.guild.id, cls=Player)
 
-        await player.startwait()
+        player.startWait()
 
         if not player.is_connected:
             return await ctx.reply('I am not connected to any channel.', delete_after=20)
@@ -413,7 +421,7 @@ class Music(commands.Cog, wavelink.WavelinkMixin):
     async def playing(self, ctx):
         player: Player = self.wavelink.get_player(ctx.guild.id, cls=Player)
 
-        await player.startwait()
+        player.startWait()
 
         if not player.is_playing:
             return await ctx.reply("Nothing is playing.")
